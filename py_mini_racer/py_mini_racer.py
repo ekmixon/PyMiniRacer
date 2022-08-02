@@ -18,9 +18,7 @@ except ImportError:
 def _get_libc_name():
     """Return the libc name of the current system."""
     target = sysconfig.get_config_var("HOST_GNU_TYPE")
-    if target is not None and target.endswith("musl"):
-        return "muslc"
-    return "glibc"
+    return "muslc" if target is not None and target.endswith("musl") else "glibc"
 
 
 def _get_lib_path(name):
@@ -30,11 +28,9 @@ def _get_lib_path(name):
     elif sys.platform == "win32":
         prefix, ext = "", ".dll"
     else:
-        prefix, ext = "lib", ".{}.so".format(_get_libc_name())
-    fn = None
+        prefix, ext = "lib", f".{_get_libc_name()}.so"
     meipass = getattr(sys, "_MEIPASS", None)
-    if meipass is not None:
-        fn = os.path.join(meipass, prefix + name + ext)
+    fn = None if meipass is None else os.path.join(meipass, prefix + name + ext)
     if fn is None and pkg_resources is not None:
         fn = pkg_resources.resource_filename("py_mini_racer", prefix + name + ext)
     if fn is None:
@@ -122,7 +118,7 @@ def is_unicode(value):
 def _build_ext_handle():
 
     if EXTENSION_PATH is None or not os.path.exists(EXTENSION_PATH):
-        raise RuntimeError("Native library not available at {}".format(EXTENSION_PATH))
+        raise RuntimeError(f"Native library not available at {EXTENSION_PATH}")
 
     _ext_handle = ctypes.CDLL(EXTENSION_PATH)
 
@@ -234,7 +230,7 @@ class MiniRacer(object):
         wrapped_expr = u"JSON.stringify((function(){return (%s)})())" % expr
         ret = self.eval(wrapped_expr, timeout=timeout, max_memory=max_memory)
         if not is_unicode(ret):
-            raise ValueError(u"Unexpected return value type {}".format(type(ret)))
+            raise ValueError(f"Unexpected return value type {type(ret)}")
         return self.json_impl.loads(ret)
 
     def call(self, expr, *args, **kwargs):
@@ -255,9 +251,9 @@ class MiniRacer(object):
         :param int max_memory: hard memory limit after which the execution is interrupted
         """
 
-        encoder = kwargs.get('encoder', None)
-        timeout = kwargs.get('timeout', None)
-        max_memory = kwargs.get('max_memory', None)
+        encoder = kwargs.get('encoder')
+        timeout = kwargs.get('timeout')
+        max_memory = kwargs.get('max_memory')
 
         json_args = self.json_impl.dumps(args, separators=(',', ':'), cls=encoder)
         js = u"{expr}.apply(this, {json_args})".format(expr=expr, json_args=json_args)
@@ -289,16 +285,17 @@ class MiniRacer(object):
         with self.lock:
             res = self.ext.mr_heap_stats(self.ctx)
 
-        if not res:
-            return {
+        return (
+            self.json_impl.loads(MiniRacerValue(self, res).to_python())
+            if res
+            else {
                 u"total_physical_size": 0,
                 u"used_heap_size": 0,
                 u"total_heap_size": 0,
                 u"total_heap_size_executable": 0,
-                u"heap_size_limit": 0
+                u"heap_size_limit": 0,
             }
-
-        return self.json_impl.loads(MiniRacerValue(self, res).to_python())
+        )
 
     def heap_snapshot(self):
         """Return a snapshot of the V8 isolate heap."""
@@ -409,16 +406,13 @@ class MiniRacerValue(object):
             result = self.value == 1
         elif typ == MiniRacerTypes.integer:
             val = self.value
-            if val is None:
-                result = 0
-            else:
-                result = ctypes.c_int32(val).value
+            result = 0 if val is None else ctypes.c_int32(val).value
         elif typ == MiniRacerTypes.double:
             result = self._double_value()
         elif typ == MiniRacerTypes.str_utf8:
             buf = ctypes.c_char_p(self.value)
             ptr = ctypes.cast(buf, ctypes.POINTER(ctypes.c_char))
-            result = ptr[0:self.len].decode("utf8")
+            result = ptr[:self.len].decode("utf8")
         elif typ == MiniRacerTypes.function:
             result = JSFunction()
         elif typ == MiniRacerTypes.date:
@@ -427,7 +421,10 @@ class MiniRacerValue(object):
             result = datetime.datetime.utcfromtimestamp(timestamp / 1000.)
         elif typ == MiniRacerTypes.symbol:
             result = JSSymbol()
-        elif typ == MiniRacerTypes.shared_array_buffer or typ == MiniRacerTypes.array_buffer:
+        elif typ in [
+            MiniRacerTypes.shared_array_buffer,
+            MiniRacerTypes.array_buffer,
+        ]:
             cdata = (ArrayBufferByte * self.len).from_address(self.value)
             # Keep a reference to prevent the GC to free the backing store
             cdata._origin = self

@@ -18,12 +18,11 @@ def babel_transform(es_string):
     ctx = py_mini_racer.MiniRacer()
 
     # Parse babel
-    ctx.eval("""var self = this; %s """ % babel_source)
+    ctx.eval(f"""var self = this; {babel_source} """)
 
     # Transform stuff :)
     val = "babel.transform(`%s`)['code']" % es_string
-    res = ctx.eval(val)
-    return res
+    return ctx.eval(val)
 
 
 if __name__ == '__main__':

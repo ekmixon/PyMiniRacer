@@ -18,7 +18,7 @@ def get_filenames(directory):
 def copy_file(filename, destination):
     """Copy the file and put the correct tag"""
 
-    print("Updating file %s" % filename)
+    print(f"Updating file {filename}")
     out_dir = os.path.abspath(destination)
 
     tags = filename[:-4].split("-")
@@ -40,14 +40,11 @@ def copy_file(filename, destination):
 
         ctx.out_wheel = os.path.join(out_dir, new_name)
 
-        print("Saving new wheel into %s" % ctx.out_wheel)
+        print(f"Saving new wheel into {ctx.out_wheel}")
 
 
 def main():
-    if len(sys.argv) == 2:
-        directory = sys.argv[1]
-    else:
-        directory = "dist"
+    directory = sys.argv[1] if len(sys.argv) == 2 else "dist"
     for filename in get_filenames(directory):
         copy_file(filename, directory)
 

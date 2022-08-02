@@ -15,10 +15,7 @@ class Test(unittest.TestCase):
     """ Test basic types """
 
     def valid(self, py_val, **kwargs):
-        if 'testee' in kwargs:
-            testee = kwargs['testee']
-        else:
-            testee = py_val
+        testee = kwargs.get('testee', py_val)
         js_str = json.dumps(py_val)
         parsed = self.mr.execute(js_str)
         self.assertEqual(testee, parsed)
@@ -116,7 +113,7 @@ class Test(unittest.TestCase):
         """
         ret = self.mr.eval(js_source)
         self.assertEqual(len(ret), 1024)
-        self.assertEqual(ret[0:1].tobytes(), b"\x42")
+        self.assertEqual(ret[:1].tobytes(), b"\x42")
 
     def test_array_buffer_view(self):
         js_source = """
@@ -138,7 +135,7 @@ class Test(unittest.TestCase):
         """
         ret = self.mr.eval(js_source)
         self.assertEqual(len(ret), 1024)
-        self.assertEqual(ret[0:1].tobytes(), b"\x42")
+        self.assertEqual(ret[:1].tobytes(), b"\x42")
         ret[1:2] = b"\xFF"
         self.assertEqual(self.mr.eval("v[1]"), 0xFF)
 

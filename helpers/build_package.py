@@ -20,7 +20,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     # Clean previous version of the lib
     for pattern in ("py_mini_racer/*.so", "py_mini_racer/*.dylib", "py_mini_racer/*.dll"):
         for filename in glob.glob(pattern):
-            print("removing {}".format(filename))
+            print(f"removing {filename}")
             os.unlink(filename)
     # Build V8
     build_v8("py_mini_racer_shared_lib")
